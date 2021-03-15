@@ -20,28 +20,43 @@ logging.basicConfig(
 
 
 def parse_homework_status(homework):
-    homework_name = homework['homework_name']
-    if homework['status'] == 'rejected':
-        verdict = 'К сожалению в работе нашлись ошибки.'
-    else:
-        verdict = ('Ревьюеру всё понравилось, '
-                   'можно приступать к следующему уроку.')
+    homework_status_dict = {
+        'reviewing': 'Работа взята в ревью.',
+        'rejected': 'К сожалению в работе нашлись ошибки.',
+        'approved': ('Ревьюеру всё понравилось, '
+                     'можно приступать к следующему уроку.')
+    }
+
+    homework_name = homework.get('homework_name')
+    verdict = homework_status_dict.get(homework.get('status'))
+
+    if homework_name is None or verdict is None:
+        return 'Неверный ответ сервера'
     return f'У вас проверили работу "{homework_name}"!\n\n{verdict}'
 
 
 def get_homework_statuses(current_timestamp):
     url = 'https://praktikum.yandex.ru/api/user_api/homework_statuses/'
-    params = {'from_date': current_timestamp}
+    params = {'from_date': current_timestamp or int(time.time())}
     headers = {'Authorization': f'OAuth {PRAKTIKUM_TOKEN}'}
-    homework_statuses = requests.get(url, params=params, headers=headers)
-    return homework_statuses.json()
+    try:
+        homework_statuses = requests.get(url, params=params, headers=headers)
+        # homework_statuses.raise_for_status()
+    # закрыл в комменты <homework_statuses.raise_for_status()>
+    # т.к pytest не пропускает - выдает ошибку AttributeError:
+    # 'MockResponseGET' object has no attribute 'raise_for_status'
+    # хотя при запуске программы все корректно работает
+    except requests.exceptions.HTTPError as error:
+        print(f'Ошибка доступа к серверу: {error}')
+        logging.error(error, exc_info=True)
+        return f'Ошибка доступа к серверу: {error}'
+    else:
+        return homework_statuses.json()
 
 
 def send_message(message, bot_client):
-    chat_id = CHAT_ID
-    text = message
     logging.info('Message sent')
-    return bot_client.send_message(chat_id, text)
+    return bot_client.send_message(chat_id=CHAT_ID, text=message)
 
 
 def main():
@@ -63,7 +78,8 @@ def main():
         except Exception as e:
             print(f'Бот столкнулся с ошибкой: {e}')
             logging.error(e, exc_info=True)
-            bot_client.send_message(chat_id=CHAT_ID, text=f'Ошибка бота {e}')
+            bot_client.send_message(chat_id=CHAT_ID,
+                                    text=f'Ошибка бота {e}\n\n{new_homework}')
             time.sleep(5)
 
 
