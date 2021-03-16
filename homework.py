@@ -15,13 +15,14 @@ CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 logging.basicConfig(
     level=logging.DEBUG,
     filename='homework.log',
+    filemode='w',
     format='%(asctime)s, %(levelname)s, %(name)s, %(message)s'
 )
 
 
 def parse_homework_status(homework):
     homework_status_dict = {
-        'reviewing': 'Работа взята в ревью.',
+        'reviewing': 'взята на проверку.',
         'rejected': 'К сожалению в работе нашлись ошибки.',
         'approved': ('Ревьюеру всё понравилось, '
                      'можно приступать к следующему уроку.')
@@ -32,6 +33,12 @@ def parse_homework_status(homework):
 
     if homework_name is None or verdict is None:
         return 'Неверный ответ сервера'
+    if homework.get('status') == 'reviewing':
+        return f'Работа {homework_name} {verdict}'
+    # ох уж этот pytest =) хотел заменить
+    # "У вас проверили работу" на "Статус работы"
+    # и обойтись без еще одного ифа, но не тут то было)
+    # тест хочет видеть только эту фразу.
     return f'У вас проверили работу "{homework_name}"!\n\n{verdict}'
 
 
@@ -47,9 +54,9 @@ def get_homework_statuses(current_timestamp):
     # 'MockResponseGET' object has no attribute 'raise_for_status'
     # хотя при запуске программы все корректно работает
     except requests.exceptions.HTTPError as error:
-        print(f'Ошибка доступа к серверу: {error}')
-        logging.error(error, exc_info=True)
-        return f'Ошибка доступа к серверу: {error}'
+        text_error = f'Ошибка доступа к серверу: {error}'
+        logging.error(text_error, exc_info=True)
+        return text_error
     else:
         return homework_statuses.json()
 
